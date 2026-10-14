@@ -9,6 +9,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 
+# Vercel sets VERCEL=1. Its filesystem is read-only except /tmp, and /tmp is
+# wiped whenever the serverless instance is recycled.
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+DEFAULT_INSTANCE_DIR = Path("/tmp/part-manager") if ON_VERCEL else BASE_DIR / "instance"
+
 
 def _env_bool(name, default):
     value = os.environ.get(name)
@@ -27,7 +32,7 @@ class Config:
     # running in debug/testing mode.
     SECRET_KEY = os.environ.get("SECRET_KEY")
 
-    INSTANCE_DIR = Path(os.environ.get("INSTANCE_DIR", BASE_DIR / "instance"))
+    INSTANCE_DIR = Path(os.environ.get("INSTANCE_DIR", DEFAULT_INSTANCE_DIR))
     DATABASE = os.environ.get("DATABASE_PATH", str(INSTANCE_DIR / "trolley_manager.db"))
     # Uploaded images live outside /static so they are only served to the
     # logged-in admin. Point this at a persistent disk/volume in production.
@@ -63,7 +68,7 @@ class Config:
     RATELIMIT_ENABLED = _env_bool("RATELIMIT_ENABLED", True)
 
     # Set when running behind a reverse proxy (nginx, Caddy, Render, ...).
-    TRUST_PROXY = _env_bool("TRUST_PROXY", False)
+    TRUST_PROXY = _env_bool("TRUST_PROXY", ON_VERCEL)
 
     # Bump to force browsers / the service worker to fetch fresh static assets.
     ASSET_VERSION = "1.4.0"
