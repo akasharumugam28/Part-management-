@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Part Manager{% endblock %}
+{% block content %}
+<section class="empty-state card">
+  <svg class="icon empty-icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+  <h1 class="page-title">{{ title }}</h1>
+  <p class="muted">{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('parts.dashboard') }}">Back to dashboard</a>
+</section>
+{% endblock %}

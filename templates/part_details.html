@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import delete_button %}
+{% block title %}Part {{ part.part_number }} · Part Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="{{ url_for('parts.dashboard') }}">
+  <svg class="icon" aria-hidden="true"><use href="#i-back"></use></svg>Dashboard</a></nav>
+
+<section class="card detail-card">
+  <img class="detail-image" src="{{ image_url(part.image_filename, 'part') }}"
+       alt="{{ 'Photo of part ' ~ part.part_number if part.image_filename else '' }}">
+  <div class="detail-body">
+    <span class="badge">{{ part.part_number }}</span>
+    <h1 class="page-title">{{ part.part_name }}</h1>
+    <dl class="meta meta-lg">
+      <div><dt>Part Number</dt><dd>{{ part.part_number }}</dd></div>
+      <div><dt>Line Storage</dt><dd>{{ part.line_storage }}</dd></div>
+      <div><dt>OLS Storage</dt><dd>{{ part.ols_storage }}</dd></div>
+      <div><dt>Trolley Qty</dt><dd>{{ part.trolley_qty or '—' }}</dd></div>
+    </dl>
+    <p class="muted small">Created {{ part.created_at | replace('T', ' ') | replace('Z', ' UTC') }}
+      · Updated {{ part.updated_at | replace('T', ' ') | replace('Z', ' UTC') }}</p>
+    <div class="button-row">
+      <a class="btn btn-secondary" href="{{ url_for('parts.edit_part', part_id=part.id) }}">
+        <svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg><span>Edit Part</span></a>
+      <button type="button" class="btn btn-secondary" data-open-dialog="#download-dialog"
+              data-form-action="{{ url_for('parts.export_part', part_id=part.id) }}" data-file-name="{{ part.part_number }}">
+        <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span>Download</span></button>
+      {{ delete_button(url_for('parts.delete_part', part_id=part.id),
+           'Delete part ' ~ part.part_name ~ ' (' ~ part.part_number ~ ')'
+           ~ (' and its ' ~ subs | length ~ ' sub-part' ~ ('' if subs | length == 1 else 's') if subs else '')
+           ~ '? This cannot be undone.',
+           label='Delete Part') }}
+    </div>
+  </div>
+</section>
+
+<section class="card form-section" aria-labelledby="sub-parts-title">
+  <div class="section-head">
+    <h2 class="section-title" id="sub-parts-title">Sub-parts <span class="count-pill" id="sub-count">{{ subs | length }}</span></h2>
+    <a class="btn btn-primary" href="{{ url_for('parts.new_sub_part', part_id=part.id) }}">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span>Add Sub-part</span></a>
+  </div>
+  {% if subs %}
+  <table class="parts-table sub-table">
+    <thead>
+      <tr>
+        <th scope="col">S.No</th>
+        <th scope="col">Image</th>
+        <th scope="col">Trolley Qty</th>
+        <th scope="col">Sub-part Name</th>
+        <th scope="col">Sub-part Number</th>
+        <th scope="col"><span class="sr-only">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in subs %}
+      <tr>
+        <td data-label="S.No" class="cell-serial">{{ loop.index }}</td>
+        <td data-label="Image" class="cell-image">
+          <img class="thumb" src="{{ image_url(s.image_filename) }}" alt="" loading="lazy">
+        </td>
+        <td data-label="Trolley Qty" class="cell-qty">
+          {% if s.trolley_qty %}<span class="qty-pill" title="Trolley Qty">{{ s.trolley_qty }}</span>{% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td data-label="Sub-part Name" class="cell-name">{{ s.part_name }}</td>
+        <td data-label="Number"><code>{{ s.part_number }}</code></td>
+        <td class="cell-actions">
+          <a class="btn btn-icon" href="{{ url_for('parts.edit_sub_part', part_id=part.id, sub_id=s.id) }}"
+             aria-label="Edit sub-part {{ s.part_number }}" title="Edit"><svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg></a>
+          {{ delete_button(url_for('parts.delete_sub_part', part_id=part.id, sub_id=s.id),
+               'Delete sub-part ' ~ s.part_name ~ ' (' ~ s.part_number ~ ')? This cannot be undone.',
+               classes='btn btn-icon btn-icon-danger', icon_only=True,
+               aria_label='Delete sub-part ' ~ s.part_number) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No sub-parts yet. Use <strong>Add Sub-part</strong> to add the items that belong to this part.</p>
+  {% endif %}
+</section>
+
+{% include "_download_dialog.html" %}
+{% endblock %}

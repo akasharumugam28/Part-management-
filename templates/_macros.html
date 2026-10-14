@@ -1,0 +1,68 @@
+{% macro field(name, label, form, errors, maxlength=120, placeholder="", autocomplete="off", hint="") -%}
+<div class="field{{ ' has-error' if errors.get(name) }}">
+  <label for="{{ name }}">{{ label }} <span class="req" aria-hidden="true">*</span></label>
+  <input type="text" id="{{ name }}" name="{{ name }}" value="{{ form.get(name, '') or '' }}"
+         required maxlength="{{ maxlength }}" placeholder="{{ placeholder }}" autocomplete="{{ autocomplete }}"
+         {% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}>
+  {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
+  <p class="field-error" id="{{ name }}-error"{% if not errors.get(name) %} hidden{% endif %}>{{ errors.get(name, '') }}</p>
+</div>
+{%- endmacro %}
+
+{% macro image_picker(name, label, errors, current_url=None, has_current=False, kind="part") -%}
+<div class="field image-field{{ ' has-error' if errors.get(name) }}">
+  <span class="label" id="{{ name }}-label">{{ label }} <span class="optional">(optional)</span></span>
+  <div class="image-picker">
+    <img class="image-preview" id="{{ name }}-preview" alt="Selected image preview"
+         src="{{ current_url or url_for('static', filename='img/placeholder-' ~ kind ~ '.svg') }}"
+         data-placeholder="{{ url_for('static', filename='img/placeholder-' ~ kind ~ '.svg') }}"
+         data-original="{{ current_url or url_for('static', filename='img/placeholder-' ~ kind ~ '.svg') }}">
+    <div class="image-picker-controls">
+      <label class="btn btn-secondary btn-sm file-button">
+        <svg class="icon" aria-hidden="true"><use href="#i-image"></use></svg>
+        <span>{{ 'Replace image' if has_current else 'Choose image' }}</span>
+        <input type="file" name="{{ name }}" id="{{ name }}" class="visually-hidden-file"
+               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+               data-preview="#{{ name }}-preview" aria-labelledby="{{ name }}-label">
+      </label>
+      <button type="button" class="btn btn-ghost btn-sm" data-clear-file="#{{ name }}" hidden>Clear selection</button>
+      {% if has_current %}
+      <label class="checkbox">
+        <input type="checkbox" name="remove_image" value="1" data-remove-image="#{{ name }}-preview">
+        <span>Remove current image</span>
+      </label>
+      {% endif %}
+      <p class="hint">JPG, PNG or WebP, up to {{ config.MAX_IMAGE_BYTES // (1024 * 1024) }} MB.</p>
+    </div>
+  </div>
+  <p class="field-error" id="{{ name }}-error"{% if not errors.get(name) %} hidden{% endif %}>{{ errors.get(name, '') }}</p>
+</div>
+{%- endmacro %}
+
+{% macro delete_button(action, message, label="Delete", classes="btn btn-danger", icon_only=False, aria_label=None) -%}
+<form method="post" action="{{ action }}" class="inline-form" data-confirm="{{ message }}" data-loading>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="{{ classes }}"{% if aria_label %} aria-label="{{ aria_label }}" title="{{ aria_label }}"{% endif %}>
+    <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
+    {% if not icon_only %}<span>{{ label }}</span>{% endif %}
+  </button>
+</form>
+{%- endmacro %}
+
+
+{% macro qty_field(form, errors, presets, max_value) -%}
+<div class="field{{ ' has-error' if errors.get('trolley_qty') }}">
+  <label for="trolley_qty">Trolley Qty <span class="optional">(optional)</span></label>
+  <div class="qty-picker">
+    {% for n in presets %}
+    <button type="button" class="chip" data-qty-preset="{{ n }}" aria-pressed="false">{{ n }}</button>
+    {% endfor %}
+    <input type="number" id="trolley_qty" name="trolley_qty" value="{{ form.get('trolley_qty') or '' }}"
+           min="1" max="{{ max_value }}" step="1" inputmode="numeric" placeholder="Other"
+           aria-describedby="trolley_qty-hint{{ ' trolley_qty-error' if errors.get('trolley_qty') }}"
+           {% if errors.get('trolley_qty') %}aria-invalid="true"{% endif %}>
+  </div>
+  <p class="hint" id="trolley_qty-hint">Parts per trolley. Tap {{ presets | join(' or ') }}, or type another number.</p>
+  <p class="field-error" id="trolley_qty-error"{% if not errors.get('trolley_qty') %} hidden{% endif %}>{{ errors.get('trolley_qty', '') }}</p>
+</div>
+{%- endmacro %}

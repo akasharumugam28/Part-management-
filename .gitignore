@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+
+# Runtime data: database, uploads, backups, logs
+instance/
+*.db
+*.db-wal
+*.db-shm
+
+# Local test artefacts
+tests/e2e/screenshots/

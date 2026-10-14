@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field, image_picker, qty_field %}
+{% set editing = sub is defined %}
+{% block title %}{{ 'Edit Sub-part ' ~ sub.part_number if editing else 'Add Sub-part' }} · Part Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="{{ url_for('parts.part_details', part_id=part.id) }}">
+  <svg class="icon" aria-hidden="true"><use href="#i-back"></use></svg>{{ part.part_name }} ({{ part.part_number }})</a></nav>
+
+<form class="card form-section stack" method="post"
+      action="{{ url_for('parts.update_sub_part', part_id=part.id, sub_id=sub.id) if editing else url_for('parts.create_sub_part', part_id=part.id) }}"
+      enctype="multipart/form-data" data-loading>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h1 class="section-title">{{ 'Edit Sub-part' if editing else 'Add Sub-part' }}</h1>
+  <p class="muted small">Inside part <strong>{{ part.part_name }}</strong> ({{ part.part_number }})</p>
+  <div class="grid-2">
+    {{ field('part_name', 'Sub-part Name', form, errors) }}
+    {{ field('part_number', 'Sub-part Number', form, errors, maxlength=80) }}
+  </div>
+  {{ qty_field(form, errors, qty_presets, qty_max) }}
+  {% if editing %}
+  {{ image_picker('image', 'Sub-part Image', errors,
+       current_url=image_url(sub.image_filename) if sub.image_filename else None,
+       has_current=sub.image_filename is not none, kind='part') }}
+  {% else %}
+  {{ image_picker('image', 'Sub-part Image', errors, kind='part') }}
+  {% endif %}
+
+  <div class="sticky-actions">
+    <a class="btn btn-secondary" href="{{ url_for('parts.part_details', part_id=part.id) }}">Cancel</a>
+    {% if editing %}
+    <button type="submit" class="btn btn-primary btn-lg" data-requires-network>
+      <span class="btn-label">Save Changes</span>
+    </button>
+    {% else %}
+    <button type="submit" class="btn btn-secondary" name="add_another" value="1" data-requires-network>
+      Save &amp; Add Another
+    </button>
+    <button type="submit" class="btn btn-primary btn-lg" data-requires-network>
+      <span class="btn-label">Add Sub-part</span>
+    </button>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

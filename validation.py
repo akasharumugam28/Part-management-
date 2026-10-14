@@ -1,0 +1,66 @@
+"""Server-side field validation for parts."""
+
+REQUIRED_MESSAGE = "Please fill in all required fields."
+
+PART_LIMITS = {
+    "part_name": ("Part Name", 120),
+    "part_number": ("Part Number", 80),
+    "line_storage": ("Line Storage", 120),
+    "ols_storage": ("OLS Storage", 120),
+}
+
+
+def clean_fields(source, limits):
+    """Return (data, errors) where errors maps field -> message."""
+    data, errors = {}, {}
+    for field, (label, max_len) in limits.items():
+        raw = source.get(field, "")
+        value = " ".join(str(raw).split()) if raw is not None else ""
+        data[field] = value
+        if not value:
+            errors[field] = f"{label} is required."
+        elif len(value) > max_len:
+            errors[field] = f"{label} must be {max_len} characters or fewer."
+    return data, errors
+
+
+QTY_PRESETS = (20, 40)
+QTY_MAX = 9999
+QTY_MESSAGE = f"Trolley Qty must be a whole number from 1 to {QTY_MAX}."
+
+
+def clean_qty(raw):
+    """Optional whole number 1..QTY_MAX. Returns (value or None, error or None)."""
+    raw = str(raw or "").strip()
+    if not raw:
+        return None, None
+    if not raw.isdigit() or not 1 <= int(raw) <= QTY_MAX:
+        return None, QTY_MESSAGE
+    return int(raw), None
+
+
+SUB_PART_LIMITS = {
+    "part_name": ("Sub-part Name", 120),
+    "part_number": ("Sub-part Number", 80),
+}
+
+
+def _clean_with_qty(source, limits):
+    data, errors = clean_fields(source, limits)
+    data["trolley_qty"], qty_error = clean_qty(source.get("trolley_qty"))
+    if qty_error:
+        errors["trolley_qty"] = qty_error
+    return data, errors
+
+
+def clean_part(source):
+    return _clean_with_qty(source, PART_LIMITS)
+
+
+def clean_sub_part(source):
+    return _clean_with_qty(source, SUB_PART_LIMITS)
+
+
+def error_message(errors):
+    """The toast shown for a rejected form."""
+    return errors["trolley_qty"] if list(errors) == ["trolley_qty"] else REQUIRED_MESSAGE

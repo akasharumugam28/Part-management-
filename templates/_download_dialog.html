@@ -1,0 +1,22 @@
+<dialog class="dialog" id="download-dialog" aria-labelledby="download-title">
+  <form method="get" action="" class="dialog-body" id="download-form">
+    <h2 id="download-title" class="dialog-title">Download</h2>
+    <div class="field">
+      <label for="download-name">File name <span class="req" aria-hidden="true">*</span></label>
+      <input type="text" id="download-name" name="name" required maxlength="80"
+             value="" autocomplete="off" placeholder="Enter a file name">
+    </div>
+    <fieldset class="field format-choice">
+      <legend class="label">Format</legend>
+      <label class="checkbox"><input type="radio" name="format" value="xlsx" checked> <span>Excel (.xlsx)</span></label>
+      <label class="checkbox"><input type="radio" name="format" value="pdf"> <span>PDF (.pdf)</span></label>
+    </fieldset>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">
+        <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
+        <span>Download</span>
+      </button>
+    </div>
+  </form>
+</dialog>

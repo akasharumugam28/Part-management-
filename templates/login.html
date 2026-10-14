@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Log in · Part Manager{% endblock %}
+{% block body_class %}page-auth{% endblock %}
+{% block content %}
+<section class="auth-card card">
+  <div class="auth-brand">
+    <img src="{{ asset('icons/icon-192.png') }}" alt="" width="64" height="64">
+    <h1>Part Manager</h1>
+    <p class="muted">Admin sign in</p>
+  </div>
+
+  {% if no_admin %}
+  <div class="notice notice-info" role="note">
+    No admin account exists yet. Run <code>flask --app app create-admin</code> on the server.
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" data-loading class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" value="{{ username or '' }}" required
+             autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn btn-primary btn-lg btn-block">Log in</button>
+  </form>
+</section>
+{% endblock %}

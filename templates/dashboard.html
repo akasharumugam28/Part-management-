@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% from "_macros.html" import delete_button %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1 class="page-title">Part Manager</h1>
+    <p class="muted">Parts and their storage locations</p>
+  </div>
+  <div class="page-head-actions">
+    <button type="button" class="btn btn-secondary btn-lg" data-open-dialog="#download-dialog"
+            data-form-action="{{ url_for('parts.export_all') }}" data-file-name="all-parts">
+      <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
+      <span>Download All</span>
+    </button>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('parts.new_part') }}">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+      <span>Create Part</span>
+    </a>
+  </div>
+</section>
+
+{% include "_download_dialog.html" %}
+
+<section class="stats" aria-label="Totals">
+  <div class="stat card">
+    <svg class="icon stat-icon" aria-hidden="true"><use href="#i-box"></use></svg>
+    <div><span class="stat-value" id="total-parts">{{ total }}</span>
+    <span class="stat-label">Total Parts</span></div>
+  </div>
+  <div class="stat card">
+    <svg class="icon stat-icon" aria-hidden="true"><use href="#i-list"></use></svg>
+    <div><span class="stat-value" id="total-sub-parts">{{ total_subs }}</span>
+    <span class="stat-label">Total Sub-parts</span></div>
+  </div>
+</section>
+
+<form class="search" role="search" method="get" action="{{ url_for('parts.dashboard') }}">
+  <label for="q" class="sr-only">Search parts</label>
+  <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+  <input type="search" id="q" name="q" value="{{ q }}" maxlength="100" autocomplete="off"
+         placeholder="Search by name, number or storage" data-live-search="#parts-table-body">
+  <button type="submit" class="btn btn-secondary">Search</button>
+</form>
+
+{% if parts %}
+<div class="table-wrap card">
+  <table class="parts-table">
+    <thead>
+      <tr>
+        <th scope="col">S.No</th>
+        <th scope="col">Image</th>
+        <th scope="col">Trolley Qty</th>
+        <th scope="col">Part Name</th>
+        <th scope="col">Part Number</th>
+        <th scope="col">Line Storage</th>
+        <th scope="col">OLS Storage</th>
+        <th scope="col"><span class="sr-only">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody id="parts-table-body" data-empty="#no-part-matches">
+      {% for p in parts %}
+      {% set p_subs = subs.get(p.id, []) %}
+      <tr data-search="{{ (p.part_name ~ ' ' ~ p.part_number ~ ' ' ~ p.line_storage ~ ' ' ~ p.ols_storage
+                           ~ ' ' ~ p_subs | map(attribute='part_name') | join(' ')
+                           ~ ' ' ~ p_subs | map(attribute='part_number') | join(' ')) | lower }}">
+        <td data-label="S.No" class="cell-serial">{{ loop.index }}</td>
+        <td data-label="Image" class="cell-image">
+          <img class="thumb" src="{{ image_url(p.image_filename) }}" alt="" loading="lazy">
+        </td>
+        <td data-label="Trolley Qty" class="cell-qty">
+          {% if p.trolley_qty %}<span class="qty-pill" title="Trolley Qty">{{ p.trolley_qty }}</span>{% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td data-label="Part Name" class="cell-name">{{ p.part_name }}
+          {% if p_subs %}<a class="sub-link" href="{{ url_for('parts.part_details', part_id=p.id) }}">{{ p_subs | length }} sub-part{{ '' if p_subs | length == 1 else 's' }}</a>{% endif %}
+        </td>
+        <td data-label="Part Number"><code>{{ p.part_number }}</code></td>
+        <td data-label="Line Storage">{{ p.line_storage }}</td>
+        <td data-label="OLS Storage">{{ p.ols_storage }}</td>
+        <td class="cell-actions">
+          <a class="btn btn-icon" href="{{ url_for('parts.part_details', part_id=p.id) }}"
+             aria-label="View part {{ p.part_number }}" title="View"><svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg></a>
+          <a class="btn btn-icon" href="{{ url_for('parts.edit_part', part_id=p.id) }}"
+             aria-label="Edit part {{ p.part_number }}" title="Edit"><svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg></a>
+          <button type="button" class="btn btn-icon" data-open-dialog="#download-dialog"
+                  data-form-action="{{ url_for('parts.export_part', part_id=p.id) }}" data-file-name="{{ p.part_number }}"
+                  aria-label="Download part {{ p.part_number }}" title="Download"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg></button>
+          {{ delete_button(url_for('parts.delete_part', part_id=p.id),
+               'Delete part ' ~ p.part_name ~ ' (' ~ p.part_number ~ ')'
+               ~ (' and its ' ~ p_subs | length ~ ' sub-part' ~ ('' if p_subs | length == 1 else 's') if p_subs else '')
+               ~ '? This cannot be undone.',
+               classes='btn btn-icon btn-icon-danger', icon_only=True,
+               aria_label='Delete part ' ~ p.part_number) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="empty-inline muted" id="no-part-matches" hidden>No parts match your filter.</p>
+</div>
+{% elif q %}
+<div class="empty-state card">
+  <svg class="icon empty-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+  <h2>No parts match “{{ q }}”</h2>
+  <p class="muted">Check the part name, number or storage and try again.</p>
+  <a class="btn btn-secondary" href="{{ url_for('parts.dashboard') }}">Clear search</a>
+</div>
+{% else %}
+<div class="empty-state card">
+  <svg class="icon empty-icon" aria-hidden="true"><use href="#i-box"></use></svg>
+  <h2>No parts yet</h2>
+  <p class="muted">Use <strong>Create Part</strong> above to add your first part and its storage locations.</p>
+</div>
+{% endif %}
+{% endblock %}

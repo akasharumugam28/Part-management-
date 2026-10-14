@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Part Manager{% endblock %}</title>
+  <meta name="description" content="Manage parts, Line Storage and OLS Storage.">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Parts">
+  <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
+  <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
+  <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+  <script src="{{ asset('js/app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}" data-sw-url="{{ url_for('pwa.service_worker') }}"
+      data-max-image-bytes="{{ config.MAX_IMAGE_BYTES }}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  {% include "_icons.html" %}
+
+  <div class="banner banner-offline" id="offline-banner" role="status" hidden>
+    <svg class="icon" aria-hidden="true"><use href="#i-offline"></use></svg>
+    You are offline. Reconnect to save changes.
+  </div>
+  <div class="banner banner-update" id="update-banner" role="status" hidden>
+    A new version of Part Manager is available.
+    <button type="button" class="btn btn-sm btn-light" id="update-reload">Reload</button>
+  </div>
+
+  {% if g.admin and not bare_layout %}
+  <header class="app-header">
+    <div class="container header-inner">
+      <a class="brand" href="{{ url_for('parts.dashboard') }}">
+        <img src="{{ asset('icons/icon-192.png') }}" alt="" width="32" height="32">
+        <span>Part Manager</span>
+      </a>
+      <nav class="header-actions" aria-label="Account">
+        <button type="button" class="btn btn-ghost btn-sm" id="install-button" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
+          <span class="btn-label">Install</span>
+        </button>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-ghost btn-sm" title="Log out">
+            <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+            <span class="btn-label">Logout</span>
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+  {% endif %}
+
+  <main id="main" class="container main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false">
+    {% if not bare_layout %}{% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="toast toast-{{ category if category in ('success', 'error', 'info') else 'info' }}"
+           role="{{ 'alert' if category == 'error' else 'status' }}">
+        <svg class="icon" aria-hidden="true"><use href="#i-{{ 'alert' if category == 'error' else ('check' if category == 'success' else 'info') }}"></use></svg>
+        <span class="toast-text">{{ message }}</span>
+        <button type="button" class="toast-close" aria-label="Dismiss">&times;</button>
+      </div>
+      {% endfor %}
+    {% endwith %}{% endif %}
+  </div>
+
+  <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog" class="dialog-body">
+      <h2 id="confirm-title" class="dialog-title">Are you sure?</h2>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" class="btn btn-secondary">Cancel</button>
+        <button type="submit" value="confirm" class="btn btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

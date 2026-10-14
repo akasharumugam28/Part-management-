@@ -1,0 +1,15 @@
+# /etc/systemd/system/trolley-manager.service
+[Unit]
+Description=Trolley Manager (gunicorn)
+After=network.target
+
+[Service]
+User=trolley
+Group=trolley
+WorkingDirectory=/opt/trolley-manager
+EnvironmentFile=/opt/trolley-manager/.env
+ExecStart=/opt/trolley-manager/.venv/bin/gunicorn -c gunicorn.conf.py wsgi:app
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

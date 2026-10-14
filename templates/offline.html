@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{# Cached by the service worker, so it must contain no private data. #}
+{% set bare_layout = true %}
+{% block title %}Offline · Part Manager{% endblock %}
+{% block body_class %}page-auth{% endblock %}
+{% block content %}
+<section class="auth-card card offline-card">
+  <svg class="icon empty-icon" aria-hidden="true"><use href="#i-offline"></use></svg>
+  <h1 class="page-title">You are offline</h1>
+  <p>You are offline. Reconnect to save changes.</p>
+  <p class="muted">Part Manager needs a connection to load and save inventory. Nothing has been saved while offline.</p>
+  <a class="btn btn-primary btn-lg btn-block" href="/" id="retry-link">Try again</a>
+</section>
+{% endblock %}

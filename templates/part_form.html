@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field, image_picker, qty_field %}
+{% set editing = part is defined %}
+{% block title %}{{ 'Edit Part ' ~ part.part_number if editing else 'Create Part' }} · Part Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="{{ url_for('parts.dashboard') }}">
+  <svg class="icon" aria-hidden="true"><use href="#i-back"></use></svg>Dashboard</a></nav>
+
+<form class="card form-section stack" method="post"
+      action="{{ url_for('parts.update_part', part_id=part.id) if editing else url_for('parts.create_part') }}"
+      enctype="multipart/form-data" data-loading>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h1 class="section-title">{{ 'Edit Part' if editing else 'Create Part' }}</h1>
+  <div class="grid-2">
+    {{ field('part_name', 'Part Name', form, errors) }}
+    {{ field('part_number', 'Part Number', form, errors, maxlength=80) }}
+    {{ field('line_storage', 'Line Storage', form, errors) }}
+    {{ field('ols_storage', 'OLS Storage', form, errors) }}
+  </div>
+  {{ qty_field(form, errors, qty_presets, qty_max) }}
+  {% if editing %}
+  {{ image_picker('image', 'Part Image', errors,
+       current_url=image_url(part.image_filename) if part.image_filename else None,
+       has_current=part.image_filename is not none, kind='part') }}
+  {% else %}
+  {{ image_picker('image', 'Part Image', errors, kind='part') }}
+  {% endif %}
+
+  <div class="sticky-actions">
+    <a class="btn btn-secondary" href="{{ url_for('parts.dashboard') }}">Cancel</a>
+    {% if editing %}
+    <button type="submit" class="btn btn-primary btn-lg" data-requires-network>
+      <span class="btn-label">Save Changes</span>
+    </button>
+    {% else %}
+    <button type="submit" class="btn btn-secondary" name="add_another" value="1" data-requires-network>
+      Save &amp; Add Another
+    </button>
+    <button type="submit" class="btn btn-primary btn-lg" data-requires-network>
+      <span class="btn-label">Create Part</span>
+    </button>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}
