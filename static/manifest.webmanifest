@@ -1,7 +1,7 @@
 {
   "name": "Part Manager",
   "short_name": "Parts",
-  "description": "Manage parts, Line Storage and OLS Storage.",
+  "description": "Manage parts, Line Storage and Current Storage.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

@@ -6,7 +6,7 @@ PART_LIMITS = {
     "part_name": ("Part Name", 120),
     "part_number": ("Part Number", 80),
     "line_storage": ("Line Storage", 120),
-    "ols_storage": ("OLS Storage", 120),
+    "ols_storage": ("Current Storage", 120),
 }
 
 

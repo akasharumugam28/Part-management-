@@ -128,7 +128,7 @@ def test_trolley_routes_are_gone(auth_client):
 def test_dashboard_parts_table(auth_client):
     create_part(auth_client, 1)
     page = auth_client.get("/").get_data(as_text=True)
-    for col in ("S.No", "Image", "Part Name", "Part Number", "Line Storage", "OLS Storage", "Actions"):
+    for col in ("S.No", "Image", "Part Name", "Part Number", "Line Storage", "Current Storage", "Actions"):
         assert f">{col}<" in page
     for label in ("View part PN-0001", "Edit part PN-0001", "Delete part PN-0001"):
         assert label in page

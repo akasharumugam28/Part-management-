@@ -25,7 +25,7 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 DEFAULT_NAME = "parts-list"
-HEADERS = ("S.No", "Image", "Trolley Qty", "Part Name", "Part Number", "Line Storage", "OLS Storage")
+HEADERS = ("S.No", "Image", "Trolley Qty", "Part Name", "Part Number", "Line Storage", "Current Storage")
 TEXT_FIELDS = ("part_name", "part_number", "line_storage", "ols_storage")
 THUMB_PX = 60
 TEAL = "0F766E"

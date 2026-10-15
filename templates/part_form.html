@@ -15,7 +15,7 @@
     {{ field('part_name', 'Part Name', form, errors) }}
     {{ field('part_number', 'Part Number', form, errors, maxlength=80) }}
     {{ field('line_storage', 'Line Storage', form, errors) }}
-    {{ field('ols_storage', 'OLS Storage', form, errors) }}
+    {{ field('ols_storage', 'Current Storage', form, errors) }}
   </div>
   {{ qty_field(form, errors, qty_presets, qty_max) }}
   {% if editing %}

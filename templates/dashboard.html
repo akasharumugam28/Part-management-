@@ -53,7 +53,7 @@
         <th scope="col">Part Name</th>
         <th scope="col">Part Number</th>
         <th scope="col">Line Storage</th>
-        <th scope="col">OLS Storage</th>
+        <th scope="col">Current Storage</th>
         <th scope="col"><span class="sr-only">Actions</span></th>
       </tr>
     </thead>
@@ -75,7 +75,7 @@
         </td>
         <td data-label="Part Number"><code>{{ p.part_number }}</code></td>
         <td data-label="Line Storage">{{ p.line_storage }}</td>
-        <td data-label="OLS Storage">{{ p.ols_storage }}</td>
+        <td data-label="Current Storage">{{ p.ols_storage }}</td>
         <td class="cell-actions">
           <a class="btn btn-icon" href="{{ url_for('parts.part_details', part_id=p.id) }}"
              aria-label="View part {{ p.part_number }}" title="View"><svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg></a>
