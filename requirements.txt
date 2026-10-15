@@ -7,6 +7,10 @@ python-dotenv==1.2.4
 openpyxl==3.1.5
 reportlab==5.0.1
 
+# PostgreSQL (Supabase) driver and Supabase Storage HTTP client
+psycopg[binary]==3.3.6
+requests==2.34.2
+
 # Production WSGI servers (gunicorn for Linux, waitress for Windows)
 gunicorn==23.0.0; sys_platform != "win32"
 waitress==3.0.2

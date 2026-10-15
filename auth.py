@@ -23,6 +23,8 @@ log = logging.getLogger(__name__)
 
 # Endpoints reachable without a session.
 PUBLIC_ENDPOINTS = {"auth.login", "static", "pwa.service_worker", "pwa.offline", "pwa.manifest"}
+# Public endpoints that never render anything depending on the logged-in admin.
+ASSET_ENDPOINTS = {"static", "pwa.service_worker", "pwa.manifest"}
 
 
 def login_required(view):
@@ -38,6 +40,8 @@ def login_required(view):
 @bp.before_app_request
 def load_admin():
     g.admin = None
+    if request.endpoint in ASSET_ENDPOINTS:
+        return  # public files: no database round trip per CSS/JS/icon request
     admin_id = session.get("admin_id")
     if admin_id is not None:
         admin = models.get_admin(admin_id)

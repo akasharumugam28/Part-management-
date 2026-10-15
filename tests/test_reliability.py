@@ -77,10 +77,10 @@ def test_unexpected_error_returns_generic_500(app, auth_client, monkeypatch):
 
 
 def test_check_constraints_enforced(app):
-    from database import connect
+    from database import IntegrityError, connect, database_target
 
-    conn = connect(app.config["DATABASE"])
-    with pytest.raises(sqlite3.IntegrityError):  # CHECK constraint on blank values
+    conn = connect(database_target(app.config))
+    with pytest.raises(IntegrityError):  # CHECK constraint on blank values
         conn.execute(
             "INSERT INTO parts (part_name, part_number, line_storage, ols_storage, created_at, updated_at) "
             "VALUES ('  ', 'b', 'c', 'd', 'x', 'x')"
@@ -88,6 +88,7 @@ def test_check_constraints_enforced(app):
     conn.close()
 
 
+@pytest.mark.sqlite_only
 def test_schema_tables_and_indexes(app):
     cols = {r["name"] for r in db_rows(app, "PRAGMA table_info(parts)")}
     assert cols == {"id", "part_name", "part_number", "line_storage", "ols_storage",
@@ -120,6 +121,7 @@ INSERT INTO parts VALUES (9, 1, 'Nut', 'PN-9', 'L-9', 'O-9', NULL, '2026-01-02T0
 """
 
 
+@pytest.mark.sqlite_only
 def test_old_trolley_database_is_migrated(tmp_path):
     cfg = make_config(tmp_path)
     conn = sqlite3.connect(cfg["DATABASE"])

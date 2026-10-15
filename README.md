@@ -98,7 +98,7 @@ Over a plain LAN address such as `http://192.168.x.x:5000`, the app works but it
 
 ## 4. Database
 
-SQLite file: `instance/trolley_manager.db`, or `DATABASE_PATH`. The full schema is in `database.py`.
+Production: **Supabase PostgreSQL** when `DATABASE_URL` is set (schema: `db/schema_postgres.sql`). Local development: SQLite file `instance/trolley_manager.db`, or `DATABASE_PATH` (schema in `database.py`). Both have the same tables and columns. See [docs/SUPABASE_VERCEL.md](docs/SUPABASE_VERCEL.md).
 
 | Table | Columns |
 |---|---|
@@ -127,7 +127,7 @@ SQLite file: `instance/trolley_manager.db`, or `DATABASE_PATH`. The full schema 
   - It decodes the file with Pillow and requires the real format to be JPEG, PNG or WebP. Decompression bombs are rejected.
   - It re-encodes the image. This strips EXIF/GPS metadata and caps dimensions at `MAX_IMAGE_DIMENSION`, default 1600 px.
   - It saves the result under a random `uuid4` filename.
-- Uploads are stored in `instance/uploads/`, outside `static/`, and served by `/uploads/<file>` **to the logged-in admin only**.
+- Uploads are stored in a **private Supabase Storage bucket** when `SUPABASE_URL` is set; pages get short-lived signed URLs, and `/uploads/<file>` redirects to one **for the logged-in admin only**. Without Supabase they are stored in `instance/uploads/`, outside `static/`, and served by `/uploads/<file>` to the logged-in admin only.
 - If there is no image, a placeholder is shown.
 - **Production:** `UPLOAD_FOLDER` and the database must live on **persistent storage**, such as a VPS disk or a mounted volume. Many PaaS hosts (Heroku, and Render or Railway without a disk) have an *ephemeral* filesystem that is wiped on redeploy. Do not keep inventory images there.
 
@@ -207,6 +207,8 @@ Put IIS, Caddy or nginx in front of it for HTTPS, and run it as a service, for e
 
 **Updating the app:** when CSS or JS changes, bump `ASSET_VERSION` in `config.py` **and** `VERSION` in `static/service-worker.js` to the same value. Open clients then show a "new version available — Reload" banner. A test checks that the two values match.
 
+**Vercel + Supabase:** see [docs/SUPABASE_VERCEL.md](docs/SUPABASE_VERCEL.md) for creating the tables and bucket, migrating the SQLite data and images (`scripts/migrate_sqlite_to_postgres.py`, `scripts/migrate_uploads_to_supabase.py`), the environment variables and deployment.
+
 ## 8. Installing on an Android phone
 
 1. Open the HTTPS URL of your deployment in **Chrome** on the phone.
@@ -228,7 +230,9 @@ Installation needs HTTPS, the manifest, and a registered service worker. All thr
 
 ```bash
 pip install -r requirements.txt
-python -m pytest                     # 64 tests
+python -m pytest                     # SQLite + local images
+$env:TEST_DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/part_manager_test"
+python -m pytest                     # the same suite on a disposable PostgreSQL database
 ```
 
 The pytest suite covers:
@@ -279,14 +283,20 @@ Screenshots are saved to `tests/e2e/screenshots/`.
 | `MAX_IMAGE_MB` / `MAX_IMAGE_DIMENSION` | `5` / `1600` | Per-image limits |
 | `MAX_REQUEST_MB` | `200` | Total size of one request |
 | `LOGIN_RATE_LIMIT` | `5 per minute;30 per hour` | Failed and successful login POSTs per IP |
-| `RATELIMIT_STORAGE_URI` | `memory://` | Use Redis with multiple workers |
+| `RATELIMIT_STORAGE_URI` | PostgreSQL if `DATABASE_URL`, else `memory://` | Where login attempt counters are kept |
+| `DATABASE_URL` | — | PostgreSQL (Supabase) connection string; unset = SQLite |
+| `DB_CONNECT_TIMEOUT` | `10` | Seconds to wait for a database connection |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | — | Supabase Storage for images; unset = `UPLOAD_FOLDER` |
+| `SUPABASE_BUCKET` | `part-images` | Private bucket for images |
+| `SUPABASE_SIGNED_URL_TTL` / `STORAGE_TIMEOUT` | `3600` / `15` | Signed image link lifetime / Storage request timeout (seconds) |
+| `ALLOW_EPHEMERAL_STORAGE` | `false` | Let a Vercel deployment start without Supabase (data is lost) |
 | `TRUST_PROXY` | `false` | Honour `X-Forwarded-*` from a reverse proxy |
 
 ## 12. Known limitations
 
 - **Single admin.** There are no roles or extra users, by design.
 - **No offline editing.** Changes need a connection; there is no background sync.
-- **Rate limits with several workers.** The default in-memory limit store is per process. Use Redis when running more than one worker.
+- **Rate limits with several workers.** Without `DATABASE_URL` the in-memory limit store is per process. Use Redis when running more than one worker. With `DATABASE_URL` the counters are shared through PostgreSQL.
 - **SQLite allows one writer at a time.** That is fine for a single admin, but not intended for many concurrent writers.
 #   P a r t - m a n a g e m e n t -  
  

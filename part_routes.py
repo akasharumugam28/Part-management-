@@ -1,10 +1,10 @@
 """Dashboard and routes for creating, viewing, editing and deleting parts."""
 import logging
 import io
-import sqlite3
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 
+import database
 import exports
 import images
 import models
@@ -21,6 +21,11 @@ def render_form(template="part_form.html", **context):
     return render_template(template, qty_presets=QTY_PRESETS, qty_max=QTY_MAX, **context)
 
 
+def image_error_status(exc):
+    # A storage outage is not the user's fault; a bad file is.
+    return 503 if isinstance(exc, images.StorageError) else 400
+
+
 def get_part_or_404(part_id):
     part = models.get_part(part_id)
     if part is None:
@@ -32,9 +37,11 @@ def get_part_or_404(part_id):
 @login_required
 def dashboard():
     q = request.args.get("q", "").strip()[:100]
+    parts = models.list_parts(q or None)
+    images.prefetch_urls(p["image_filename"] for p in parts)
     return render_template(
         "dashboard.html",
-        parts=models.list_parts(q or None),
+        parts=parts,
         subs=models.sub_parts_by_part(),
         total=models.count_parts(),
         total_subs=models.count_sub_parts(),
@@ -93,12 +100,12 @@ def create_part():
             new_file = images.validate_and_save(storage)
         except images.ImageError as exc:
             errors["image"] = str(exc)
-            return fail(str(exc), 400)
+            return fail(str(exc), image_error_status(exc))
     data["image_filename"] = new_file
 
     try:
         part_id = models.create_part(data)
-    except sqlite3.Error:
+    except database.Error:
         log.exception("Database error while creating part")
         images.delete_files([new_file])
         return fail(GENERIC_ERROR, 500)
@@ -116,13 +123,16 @@ def create_part():
 @login_required
 def part_details(part_id):
     part = get_part_or_404(part_id)
-    return render_template("part_details.html", part=part, subs=models.list_sub_parts(part_id))
+    subs = models.list_sub_parts(part_id)
+    images.prefetch_urls([part["image_filename"], *(s["image_filename"] for s in subs)])
+    return render_template("part_details.html", part=part, subs=subs)
 
 
 @bp.route("/parts/<int:part_id>/edit")
 @login_required
 def edit_part(part_id):
     part = get_part_or_404(part_id)
+    images.prefetch_urls([part["image_filename"]])
     return render_form(part=part, form=dict(part), errors={})
 
 
@@ -145,11 +155,11 @@ def update_part(part_id):
         )
     except images.ImageError as exc:
         errors["image"] = str(exc)
-        return fail(str(exc), 400)
+        return fail(str(exc), image_error_status(exc))
 
     try:
         models.update_part(part_id, data)
-    except sqlite3.Error:
+    except database.Error:
         log.exception("Database error while updating part id=%s", part_id)
         images.delete_files([new_file])
         return fail(GENERIC_ERROR, 500)
@@ -168,7 +178,7 @@ def delete_part(part_id):
     sub_images = [s["image_filename"] for s in models.list_sub_parts(part_id)]
     try:
         models.delete_part(part_id)  # sub-parts go with it (ON DELETE CASCADE)
-    except sqlite3.Error:
+    except database.Error:
         log.exception("Database error while deleting part id=%s", part_id)
         flash(GENERIC_ERROR, "error")
         return redirect(url_for("parts.dashboard"), code=303)
@@ -214,12 +224,12 @@ def create_sub_part(part_id):
             new_file = images.validate_and_save(storage)
         except images.ImageError as exc:
             errors["image"] = str(exc)
-            return fail(str(exc), 400)
+            return fail(str(exc), image_error_status(exc))
     data["image_filename"] = new_file
 
     try:
         sub_id = models.create_sub_part(part_id, data)
-    except sqlite3.Error:
+    except database.Error:
         log.exception("Database error while creating sub-part of part id=%s", part_id)
         images.delete_files([new_file])
         return fail(GENERIC_ERROR, 500)
@@ -236,6 +246,7 @@ def create_sub_part(part_id):
 def edit_sub_part(part_id, sub_id):
     part = get_part_or_404(part_id)
     sub = get_sub_part_or_404(part_id, sub_id)
+    images.prefetch_urls([sub["image_filename"]])
     return render_form("sub_part_form.html", part=part, sub=sub, form=dict(sub), errors={})
 
 
@@ -259,11 +270,11 @@ def update_sub_part(part_id, sub_id):
         )
     except images.ImageError as exc:
         errors["image"] = str(exc)
-        return fail(str(exc), 400)
+        return fail(str(exc), image_error_status(exc))
 
     try:
         models.update_sub_part(sub_id, data)
-    except sqlite3.Error:
+    except database.Error:
         log.exception("Database error while updating sub-part id=%s", sub_id)
         images.delete_files([new_file])
         return fail(GENERIC_ERROR, 500)
@@ -279,7 +290,7 @@ def delete_sub_part(part_id, sub_id):
     sub = get_sub_part_or_404(part_id, sub_id)
     try:
         models.delete_sub_part(sub_id)
-    except sqlite3.Error:
+    except database.Error:
         log.exception("Database error while deleting sub-part id=%s", sub_id)
         flash(GENERIC_ERROR, "error")
         return redirect(url_for("parts.part_details", part_id=part_id), code=303)

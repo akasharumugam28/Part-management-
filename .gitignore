@@ -12,3 +12,10 @@ instance/
 
 # Local test artefacts
 tests/e2e/screenshots/
+
+# Other local env files (keep the template)
+.env.*
+!.env.example
+
+# Vercel CLI project link
+.vercel/

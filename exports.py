@@ -3,10 +3,8 @@ import io
 import logging
 import re
 from datetime import datetime
-from pathlib import Path
 from xml.sax.saxutils import escape
 
-from flask import current_app
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XlImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -17,6 +15,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Image as PdfImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+import images
 
 log = logging.getLogger(__name__)
 
@@ -64,13 +64,19 @@ def _summary(parts, subs):
     return f"Generated {datetime.now():%d %b %Y %H:%M} · {text}"
 
 
-def _thumbnail(filename):
+def _thumbnails(parts, subs):
+    """Map image filename -> small PNG bytes (or None), fetched in one go."""
+    names = [rec["image_filename"] for _, rec, _ in _rows(parts, subs)]
+    return {name: _thumbnail(name, data) for name, data in images.read_many(names).items()}
+
+
+def _thumbnail(filename, data):
     """Return a small PNG of the image as bytes, or None."""
-    if not filename:
+    if data is None:
+        log.warning("Could not read image %r for export", filename)
         return None
-    path = Path(current_app.config["UPLOAD_FOLDER"]) / filename
     try:
-        with Image.open(path) as img:
+        with Image.open(io.BytesIO(data)) as img:
             img = img.convert("RGB")
             img.thumbnail((THUMB_PX * 2, THUMB_PX * 2))
             buf = io.BytesIO()
@@ -89,6 +95,7 @@ def _scaled(png, box):
 
 
 def build_xlsx(parts, subs, title):
+    thumbs = _thumbnails(parts, subs)
     wb = Workbook()
     ws = wb.active
     ws.title = "Parts"
@@ -121,7 +128,7 @@ def build_xlsx(parts, subs, title):
                 cell.font = Font(bold=True)
         for col in (1, 3):
             ws.cell(row, col).alignment = Alignment(horizontal="center", vertical="center")
-        png = _thumbnail(rec["image_filename"])
+        png = thumbs.get(rec["image_filename"])
         if png:
             pic = XlImage(io.BytesIO(png))
             pic.width, pic.height = _scaled(png, THUMB_PX)
@@ -137,6 +144,7 @@ def build_xlsx(parts, subs, title):
 
 
 def build_pdf(parts, subs, title):
+    thumbs = _thumbnails(parts, subs)
     out = io.BytesIO()
     doc = SimpleDocTemplate(
         out, pagesize=landscape(A4), title=title,
@@ -156,7 +164,7 @@ def build_pdf(parts, subs, title):
     rows = [list(HEADERS)]
     sub_rows = []
     for sno, rec, is_sub in _rows(parts, subs):
-        png = _thumbnail(rec["image_filename"])
+        png = thumbs.get(rec["image_filename"])
         if png:
             w, h = _scaled(png, thumb)
             img = PdfImage(io.BytesIO(png), width=w, height=h)

@@ -1,4 +1,8 @@
 import io
+import os
+from pathlib import Path
+
+import pytest
 
 from conftest import create_part, db_rows, part_dict, upload, upload_files
 
@@ -144,6 +148,53 @@ def test_dashboard_search(auth_client):
 def test_invalid_part_id_returns_404(auth_client):
     assert auth_client.get("/parts/999").status_code == 404
     assert auth_client.get("/parts/abc").status_code == 404
+
+
+def noise_image(size, mode="RGB"):
+    """Random pixels: the worst case for compression."""
+    from PIL import Image
+    return Image.frombytes(mode, size, os.urandom(size[0] * size[1] * len(mode)))
+
+
+@pytest.mark.parametrize("fmt,mode", [("JPEG", "RGB"), ("PNG", "RGB"), ("PNG", "RGBA"), ("WEBP", "RGB")])
+def test_encode_within_caps_stored_size(fmt, mode):
+    from PIL import Image
+    from images import encode_within
+    limit = 2 * 1024 * 1024
+    data = encode_within(noise_image((1600, 1200), mode), fmt, limit)
+    assert len(data) <= limit
+    with Image.open(io.BytesIO(data)) as img:
+        assert img.format == fmt and max(img.size) >= 640 and img.size[0] > img.size[1]
+
+
+def test_encode_within_keeps_small_images_untouched():
+    from PIL import Image
+    from images import encode_within
+    data = encode_within(Image.new("RGB", (1600, 1200), (13, 148, 136)), "JPEG", 2 * 1024 * 1024)
+    with Image.open(io.BytesIO(data)) as img:
+        assert img.size == (1600, 1200)  # already small: full size, no downscale
+
+
+def test_uploaded_image_is_compressed_to_limit(tmp_path):
+    from app import create_app
+    from conftest import login, make_config
+    from PIL import Image
+    limit = 1_500_000  # random pixels at 640 px are ~1.2 MB as PNG
+    app = create_app(make_config(tmp_path, MAX_STORED_IMAGE_BYTES=limit,
+                                 MAX_IMAGE_BYTES=5 * 1024 * 1024))
+    app.test_cli_runner().invoke(args=["create-admin"])
+    c = app.test_client()
+    login(c)
+    buf = io.BytesIO()
+    noise_image((1000, 1000)).save(buf, "PNG")
+    assert buf.tell() > limit
+    buf.seek(0)
+    assert create_part(c, 1, {"image": (buf, "big.png")}).status_code == 303
+    [name] = upload_files(app)
+    stored = Path(app.config["UPLOAD_FOLDER"]) / name
+    assert name.endswith(".png") and stored.stat().st_size <= limit
+    with Image.open(stored) as img:
+        assert img.format == "PNG" and img.size[0] == img.size[1] >= 640
 
 
 def test_oversized_image_rejected(tmp_path):

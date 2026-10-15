@@ -51,10 +51,10 @@ def test_qty_shown_next_to_image_and_on_details(auth_client):
 
 
 def test_database_rejects_bad_qty(app):
-    from database import connect
+    from database import IntegrityError, connect, database_target
 
-    conn = connect(app.config["DATABASE"])
-    with pytest.raises(sqlite3.IntegrityError):
+    conn = connect(database_target(app.config))
+    with pytest.raises(IntegrityError):
         conn.execute(
             "INSERT INTO parts (part_name, part_number, line_storage, ols_storage, trolley_qty, "
             "created_at, updated_at) VALUES ('a', 'b', 'c', 'd', 0, 'x', 'x')"
@@ -62,6 +62,7 @@ def test_database_rejects_bad_qty(app):
     conn.close()
 
 
+@pytest.mark.sqlite_only
 def test_existing_database_gets_qty_column(tmp_path):
     cfg = make_config(tmp_path)
     conn = sqlite3.connect(cfg["DATABASE"])

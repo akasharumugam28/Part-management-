@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import (
     Flask,
+    abort,
     flash,
     jsonify,
     redirect,
@@ -28,9 +29,12 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 load_dotenv()
 
 import auth  # noqa: E402
+import config  # noqa: E402
 import database  # noqa: E402
+import images  # noqa: E402
 import part_routes  # noqa: E402
 import pwa  # noqa: E402
+import ratelimit_pg  # noqa: E402,F401  (registers the pglimits:// rate-limit storage)
 from config import Config  # noqa: E402
 from extensions import csrf, limiter  # noqa: E402
 
@@ -53,7 +57,12 @@ def create_app(overrides=None):
     # Every path is final here (Config + overrides), so nothing is created
     # under a default location that the caller has overridden.
     _ensure_secret_key(app)
-    folders = ["UPLOAD_FOLDER", "BACKUP_FOLDER"]
+    _configure_backends(app)
+    # Only folders that are actually used are created: with Supabase nothing
+    # is written to disk at startup (Vercel's /var/task is read-only).
+    folders = []
+    if app.config["STORAGE_BACKEND"] == "local":
+        folders.append("UPLOAD_FOLDER")
     if app.config["LOG_TO_FILE"]:
         folders.append("LOG_FOLDER")
     for key in folders:
@@ -67,7 +76,10 @@ def create_app(overrides=None):
     csrf.init_app(app)
     limiter.init_app(app)
     database.register(app)
-    database.init_db(app.config["DATABASE"])  # idempotent CREATE IF NOT EXISTS
+    if not database.uses_postgres(app.config):
+        # Local SQLite: idempotent CREATE IF NOT EXISTS. PostgreSQL schema
+        # changes are never run on startup; use `flask init-db` once instead.
+        database.init_db(app.config["DATABASE"])
 
     app.register_blueprint(auth.bp)
     app.register_blueprint(part_routes.bp)
@@ -76,6 +88,14 @@ def create_app(overrides=None):
     @app.route("/uploads/<path:filename>")
     @auth.login_required
     def uploaded_file(filename):
+        if app.config["STORAGE_BACKEND"] == "supabase":
+            # Private bucket: hand the browser a short-lived signed URL.
+            url = images.storage().signed_url(filename) if images.is_safe_name(filename) else None
+            if url is None:
+                abort(404)
+            response = redirect(url, code=302)
+            response.headers["Cache-Control"] = "private, max-age=300"
+            return response
         response = send_from_directory(app.config["UPLOAD_FOLDER"], filename)
         # Filenames are random and never reused, so the browser may keep them;
         # "private" keeps them out of shared caches.
@@ -86,7 +106,7 @@ def create_app(overrides=None):
     def template_helpers():
         def image_url(filename, kind="part"):
             if filename:
-                return url_for("uploaded_file", filename=filename)
+                return images.cached_url(filename) or url_for("uploaded_file", filename=filename)
             return url_for("static", filename=f"img/placeholder-{kind}.svg")
 
         def asset(path):
@@ -94,10 +114,16 @@ def create_app(overrides=None):
 
         return {"image_url": image_url, "asset": asset}
 
+    csp = CSP
+    if app.config["STORAGE_BACKEND"] == "supabase":
+        # Signed image URLs point at the Supabase project.
+        origin = app.config["SUPABASE_URL"].rstrip("/")
+        csp = csp.replace("img-src 'self'", f"img-src 'self' {origin}", 1)
+
     @app.after_request
     def security_headers(response):
         h = response.headers
-        h.setdefault("Content-Security-Policy", CSP)
+        h.setdefault("Content-Security-Policy", csp)
         h.setdefault("X-Content-Type-Options", "nosniff")
         h.setdefault("X-Frame-Options", "DENY")
         h.setdefault("Referrer-Policy", "same-origin")
@@ -123,12 +149,60 @@ def _ensure_secret_key(app):
     raise RuntimeError("SECRET_KEY environment variable must be set in production.")
 
 
+def _configure_backends(app):
+    """Pick the database / image / rate-limit backends and check their settings."""
+    cfg = app.config
+    url = cfg.get("DATABASE_URL")
+    if url and not database.is_postgres_url(url):
+        raise RuntimeError("DATABASE_URL must be a postgresql:// connection string.")
+
+    if cfg.get("SUPABASE_URL"):
+        if not cfg.get("SUPABASE_SERVICE_ROLE_KEY"):
+            raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY must be set when SUPABASE_URL is set.")
+        if not str(cfg["SUPABASE_URL"]).startswith("https://") and not app.testing:
+            raise RuntimeError("SUPABASE_URL must start with https://")
+        if not images.is_safe_name(cfg.get("SUPABASE_BUCKET") or ""):
+            raise RuntimeError("SUPABASE_BUCKET must be a plain bucket name.")
+        cfg["STORAGE_BACKEND"] = "supabase"
+    else:
+        cfg["STORAGE_BACKEND"] = "local"
+
+    if not cfg.get("RATELIMIT_STORAGE_URI"):
+        if url:
+            cfg["RATELIMIT_STORAGE_URI"] = f"{ratelimit_pg.SCHEME}://"
+            cfg["RATELIMIT_STORAGE_OPTIONS"] = {
+                "dsn": url, "connect_timeout": cfg["DB_CONNECT_TIMEOUT"],
+            }
+        else:
+            cfg["RATELIMIT_STORAGE_URI"] = "memory://"
+
+    # Serverless instances keep nothing between cold starts: without Supabase
+    # every part and image would silently disappear. Refuse to start instead.
+    if config.on_serverless_platform() and not app.testing and not cfg["ALLOW_EPHEMERAL_STORAGE"]:
+        missing = []
+        if not url:
+            missing.append("DATABASE_URL")
+        if cfg["STORAGE_BACKEND"] != "supabase":
+            missing += ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
+        if missing:
+            raise RuntimeError(
+                "Persistent storage is not configured for this serverless deployment. "
+                f"Set {', '.join(missing)} in the project's environment variables "
+                "(or ALLOW_EPHEMERAL_STORAGE=true for a throwaway demo)."
+            )
+
+
 def _warn_if_ephemeral_storage(app):
     """Data under the temp dir (e.g. /tmp on Vercel) is lost on every cold start."""
     if app.testing:
         return
     tmp = Path(tempfile.gettempdir()).resolve()
-    for key in ("DATABASE", "UPLOAD_FOLDER"):
+    keys = []
+    if not database.uses_postgres(app.config):
+        keys.append("DATABASE")
+    if app.config["STORAGE_BACKEND"] == "local":
+        keys.append("UPLOAD_FOLDER")
+    for key in keys:
         path = Path(app.config[key]).resolve()
         if path.is_relative_to(tmp):
             app.logger.warning(

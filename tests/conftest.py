@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 from pathlib import Path
 
@@ -9,6 +10,61 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app import create_app  # noqa: E402
+
+# Run the suite against PostgreSQL by pointing this at a disposable database
+# (its name must contain "test"; every table in it is emptied before each test):
+#   $env:TEST_DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/part_manager_test"
+# Unset, the suite uses a fresh SQLite file per test. It never uses
+# DATABASE_URL / SUPABASE_* from .env, so production data is never touched.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or None
+POSTGRES = TEST_DATABASE_URL is not None
+
+
+def _check_test_database_url(url):
+    import psycopg.conninfo
+
+    name = psycopg.conninfo.conninfo_to_dict(url).get("dbname", "")
+    if "test" not in name.lower():
+        raise pytest.UsageError(
+            f"TEST_DATABASE_URL database name {name!r} does not contain 'test'. Refusing to "
+            "empty it: use a separate, disposable test database."
+        )
+    if url == os.environ.get("DATABASE_URL"):
+        raise pytest.UsageError("TEST_DATABASE_URL must not be the same as DATABASE_URL.")
+
+
+def pytest_configure(config):
+    if POSTGRES:
+        _check_test_database_url(TEST_DATABASE_URL)
+
+
+def pytest_collection_modifyitems(config, items):
+    skip_pg = pytest.mark.skip(reason="SQLite-specific (TEST_DATABASE_URL is set)")
+    skip_sqlite = pytest.mark.skip(reason="needs TEST_DATABASE_URL (PostgreSQL)")
+    for item in items:
+        if POSTGRES and "sqlite_only" in item.keywords:
+            item.add_marker(skip_pg)
+        if not POSTGRES and "postgres_only" in item.keywords:
+            item.add_marker(skip_sqlite)
+
+
+def reset_postgres(url):
+    from database import connect_postgres, init_postgres
+
+    db = connect_postgres(url)
+    try:
+        init_postgres(db)
+        db.execute("TRUNCATE sub_parts, parts, admin, rate_limits RESTART IDENTITY CASCADE")
+    finally:
+        db.close()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_postgres():
+    if POSTGRES:
+        reset_postgres(TEST_DATABASE_URL)
+    yield
+
 
 def make_config(tmp_path, **extra):
     cfg = {
@@ -21,6 +77,11 @@ def make_config(tmp_path, **extra):
         "WTF_CSRF_ENABLED": False,
         "RATELIMIT_ENABLED": False,
         "SESSION_COOKIE_SECURE": False,
+        "DATABASE_URL": TEST_DATABASE_URL,
+        # Never talk to a real Supabase project from tests, whatever .env says.
+        "SUPABASE_URL": None,
+        "SUPABASE_SERVICE_ROLE_KEY": None,
+        "RATELIMIT_STORAGE_URI": None,
     }
     cfg.update(extra)
     return cfg
@@ -81,9 +142,9 @@ def create_part(client, i=1, files=None, **overrides):
 
 
 def db_rows(app, sql, params=()):
-    from database import connect
+    from database import connect, database_target
 
-    conn = connect(app.config["DATABASE"])
+    conn = connect(database_target(app.config))
     try:
         return conn.execute(sql, params).fetchall()
     finally:

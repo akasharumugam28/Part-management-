@@ -1,0 +1,19 @@
+# Never upload local data or secrets to Vercel.
+.env
+.venv/
+instance/
+*.db
+*.db-wal
+*.db-shm
+*.bak
+
+# Not needed by the running app.
+tests/
+deploy/
+scripts/
+.pytest_cache/
+__pycache__/
+*.pyc
+.env.*
+!.env.example
+.vercel/

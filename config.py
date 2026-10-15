@@ -60,6 +60,24 @@ class Config:
     # running in debug/testing mode.
     SECRET_KEY = os.environ.get("SECRET_KEY")
 
+    # PostgreSQL (Supabase). When set, it is used instead of the SQLite file
+    # below. On Vercel use the *transaction pooler* string (port 6543).
+    DATABASE_URL = os.environ.get("DATABASE_URL") or None
+    DB_CONNECT_TIMEOUT = _env_int("DB_CONNECT_TIMEOUT", 10)
+
+    # Supabase Storage for images. When SUPABASE_URL is set, images go to this
+    # private bucket instead of UPLOAD_FOLDER. The service-role key is a
+    # server-side secret: it is only ever sent from the server to Supabase.
+    SUPABASE_URL = os.environ.get("SUPABASE_URL") or None
+    SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or None
+    SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "part-images")
+    SUPABASE_SIGNED_URL_TTL = _env_int("SUPABASE_SIGNED_URL_TTL", 3600)  # seconds
+    STORAGE_TIMEOUT = _env_int("STORAGE_TIMEOUT", 15)  # seconds per Storage request
+
+    # On Vercel the app refuses to start on throwaway /tmp storage unless this
+    # is set (useful only for a quick demo deployment).
+    ALLOW_EPHEMERAL_STORAGE = _env_bool("ALLOW_EPHEMERAL_STORAGE", False)
+
     INSTANCE_DIR = Path(os.environ.get("INSTANCE_DIR", DEFAULT_INSTANCE_DIR))
     DATABASE = os.environ.get("DATABASE_PATH", str(INSTANCE_DIR / "trolley_manager.db"))
     # Uploaded images live outside /static so they are only served to the
@@ -73,8 +91,13 @@ class Config:
     LOG_TO_FILE = _env_bool("LOG_TO_FILE", not SERVERLESS)
 
     # Image limits (per file). These are upload limits, not part-count limits.
-    MAX_IMAGE_BYTES = _env_int("MAX_IMAGE_MB", 5) * 1024 * 1024
+    # Vercel rejects request bodies over 4.5 MB before they reach the app, so
+    # the default there is 4 MB to keep the app's own "too large" message.
+    MAX_IMAGE_BYTES = _env_int("MAX_IMAGE_MB", 4 if SERVERLESS else 5) * 1024 * 1024
     MAX_IMAGE_DIMENSION = _env_int("MAX_IMAGE_DIMENSION", 1600)
+    # Size limit of the re-encoded file that is actually stored. Bigger results
+    # are recompressed / scaled down (see images.encode_within).
+    MAX_STORED_IMAGE_BYTES = _env_int("MAX_STORED_IMAGE_MB", 2) * 1024 * 1024
     ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
     # Whole-request limits. They reflect hosting capacity only.
@@ -92,10 +115,11 @@ class Config:
     # CSRF (Flask-WTF)
     WTF_CSRF_TIME_LIMIT = None  # token valid for the life of the session
 
-    # Login rate limiting (Flask-Limiter). Use a shared backend such as
-    # redis://localhost:6379 when running several worker processes.
+    # Login rate limiting (Flask-Limiter). Unset: counters live in PostgreSQL
+    # when DATABASE_URL is set (shared by every serverless instance), else in
+    # memory. Or point it at a shared backend such as redis://localhost:6379.
     LOGIN_RATE_LIMIT = os.environ.get("LOGIN_RATE_LIMIT", "5 per minute;30 per hour")
-    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI") or None
     RATELIMIT_ENABLED = _env_bool("RATELIMIT_ENABLED", True)
 
     # Set when running behind a reverse proxy (nginx, Caddy, Render, ...).

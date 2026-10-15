@@ -1,7 +1,7 @@
 """Data access functions. Every query is parameterized."""
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database import get_db, utcnow
+from database import get_db, insert, like_operator, utcnow
 
 PART_FIELDS = ("part_name", "part_number", "line_storage", "ols_storage")
 
@@ -13,8 +13,10 @@ def get_admin(admin_id):
 
 
 def get_admin_by_username(username):
+    # Usernames are case-insensitive (lower() matches SQLite's NOCASE for ASCII
+    # and the PostgreSQL unique index on lower(username)).
     return get_db().execute(
-        "SELECT * FROM admin WHERE username = ?", (username.strip(),)
+        "SELECT * FROM admin WHERE lower(username) = lower(?)", (username.strip(),)
     ).fetchone()
 
 
@@ -57,19 +59,21 @@ def _escape_like(term):
 
 def list_parts(search=None):
     """All parts; with ``search``, those matching it or having a matching sub-part."""
+    db = get_db()
     sql = "SELECT * FROM parts"
     params = ()
     if search:
         like = f"%{_escape_like(search)}%"
+        op = like_operator(db)  # case-insensitive on both backends
         sql += (
-            " WHERE part_name LIKE ? ESCAPE '\\' OR part_number LIKE ? ESCAPE '\\'"
-            " OR line_storage LIKE ? ESCAPE '\\' OR ols_storage LIKE ? ESCAPE '\\'"
+            f" WHERE part_name {op} ? ESCAPE '\\' OR part_number {op} ? ESCAPE '\\'"
+            f" OR line_storage {op} ? ESCAPE '\\' OR ols_storage {op} ? ESCAPE '\\'"
             " OR EXISTS (SELECT 1 FROM sub_parts s WHERE s.part_id = parts.id"
-            " AND (s.part_name LIKE ? ESCAPE '\\' OR s.part_number LIKE ? ESCAPE '\\'))"
+            f" AND (s.part_name {op} ? ESCAPE '\\' OR s.part_number {op} ? ESCAPE '\\'))"
         )
         params = (like,) * 6
     sql += " ORDER BY id"
-    return get_db().execute(sql, params).fetchall()
+    return db.execute(sql, params).fetchall()
 
 
 def count_parts():
@@ -82,12 +86,12 @@ def get_part(part_id):
 
 def create_part(data):
     now = utcnow()
-    cur = get_db().execute(
+    return insert(
+        get_db(),
         "INSERT INTO parts (part_name, part_number, line_storage, ols_storage, "
         "trolley_qty, image_filename, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (*(data[f] for f in PART_FIELDS), data.get("trolley_qty"), data.get("image_filename"), now, now),
     )
-    return cur.lastrowid
 
 
 def update_part(part_id, data):
@@ -136,13 +140,13 @@ def get_sub_part(part_id, sub_id):
 
 def create_sub_part(part_id, data):
     now = utcnow()
-    cur = get_db().execute(
+    return insert(
+        get_db(),
         "INSERT INTO sub_parts (part_id, part_name, part_number, trolley_qty, image_filename, "
         "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (part_id, *(data[f] for f in SUB_PART_FIELDS), data.get("trolley_qty"),
          data.get("image_filename"), now, now),
     )
-    return cur.lastrowid
 
 
 def update_sub_part(sub_id, data):
