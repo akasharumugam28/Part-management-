@@ -7,6 +7,7 @@ import logging
 import mimetypes
 import os
 import secrets
+import tempfile
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -49,10 +50,16 @@ def create_app(overrides=None):
     if overrides:
         app.config.update(overrides)
 
+    # Every path is final here (Config + overrides), so nothing is created
+    # under a default location that the caller has overridden.
     _ensure_secret_key(app)
-    for key in ("UPLOAD_FOLDER", "BACKUP_FOLDER", "LOG_FOLDER"):
+    folders = ["UPLOAD_FOLDER", "BACKUP_FOLDER"]
+    if app.config["LOG_TO_FILE"]:
+        folders.append("LOG_FOLDER")
+    for key in folders:
         Path(app.config[key]).mkdir(parents=True, exist_ok=True)
     _configure_logging(app)
+    _warn_if_ephemeral_storage(app)
 
     if app.config["TRUST_PROXY"]:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -116,19 +123,35 @@ def _ensure_secret_key(app):
     raise RuntimeError("SECRET_KEY environment variable must be set in production.")
 
 
+def _warn_if_ephemeral_storage(app):
+    """Data under the temp dir (e.g. /tmp on Vercel) is lost on every cold start."""
+    if app.testing:
+        return
+    tmp = Path(tempfile.gettempdir()).resolve()
+    for key in ("DATABASE", "UPLOAD_FOLDER"):
+        path = Path(app.config[key]).resolve()
+        if path.is_relative_to(tmp):
+            app.logger.warning(
+                "%s is in the temporary directory (%s). It is NOT persistent: "
+                "data is lost whenever the server instance is recycled.", key, path,
+            )
+
+
 def _configure_logging(app):
     root = logging.getLogger()
     if app.testing or any(getattr(h, "_trolley", False) for h in root.handlers):
         return
     root.setLevel(logging.INFO)
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    file_handler = RotatingFileHandler(
-        Path(app.config["LOG_FOLDER"]) / "app.log", maxBytes=1_000_000, backupCount=5,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(fmt)
-    file_handler._trolley = True
-    root.addHandler(file_handler)
+    file_handler = None
+    if app.config["LOG_TO_FILE"]:
+        file_handler = RotatingFileHandler(
+            Path(app.config["LOG_FOLDER"]) / "app.log", maxBytes=1_000_000, backupCount=5,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(fmt)
+        file_handler._trolley = True
+        root.addHandler(file_handler)
     if not any(isinstance(h, logging.StreamHandler) for h in root.handlers if h is not file_handler):
         console = logging.StreamHandler()
         console.setFormatter(fmt)
