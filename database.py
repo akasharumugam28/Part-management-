@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS parts (
     image_filename TEXT,
     trolley_qty    INTEGER CHECK (trolley_qty IS NULL OR trolley_qty BETWEEN 1 AND 9999),
     created_at     TEXT    NOT NULL,
-    updated_at     TEXT    NOT NULL
+    updated_at     TEXT    NOT NULL,
+    total_trolleys INTEGER CHECK (total_trolleys IS NULL OR total_trolleys BETWEEN 0 AND 9999),
+    empty_trolleys INTEGER CHECK (empty_trolleys IS NULL OR empty_trolleys BETWEEN 0 AND 9999)
 )
 """
 
@@ -73,7 +75,8 @@ CREATE INDEX IF NOT EXISTS idx_sub_parts_part_id ON sub_parts (part_id);
 TABLES = {
     "admin": ("id", "username", "password_hash", "must_change_password", "created_at"),
     "parts": ("id", "part_name", "part_number", "line_storage", "ols_storage",
-              "image_filename", "trolley_qty", "created_at", "updated_at"),
+              "image_filename", "trolley_qty", "created_at", "updated_at",
+              "total_trolleys", "empty_trolleys"),
     "sub_parts": ("id", "part_id", "part_name", "part_number", "trolley_qty",
                   "image_filename", "created_at", "updated_at"),
 }
@@ -281,19 +284,25 @@ def init_db(target):
         conn.execute("PRAGMA journal_mode = WAL")
         _drop_trolleys(conn, path)
         conn.executescript(SCHEMA)
-        _add_trolley_qty(conn)
+        _add_part_columns(conn)
     finally:
         conn.close()
 
 
-def _add_trolley_qty(conn):
-    """Add the trolley_qty column to databases created before it existed."""
+# Columns added to parts after its first release, with their definitions.
+ADDED_PART_COLUMNS = {
+    "trolley_qty": "INTEGER CHECK (trolley_qty IS NULL OR trolley_qty BETWEEN 1 AND 9999)",
+    "total_trolleys": "INTEGER CHECK (total_trolleys IS NULL OR total_trolleys BETWEEN 0 AND 9999)",
+    "empty_trolleys": "INTEGER CHECK (empty_trolleys IS NULL OR empty_trolleys BETWEEN 0 AND 9999)",
+}
+
+
+def _add_part_columns(conn):
+    """Add columns to parts tables created before those columns existed."""
     columns = {r["name"] for r in conn.execute("PRAGMA table_info(parts)")}
-    if "trolley_qty" not in columns:
-        conn.execute(
-            "ALTER TABLE parts ADD COLUMN trolley_qty INTEGER "
-            "CHECK (trolley_qty IS NULL OR trolley_qty BETWEEN 1 AND 9999)"
-        )
+    for name, definition in ADDED_PART_COLUMNS.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE parts ADD COLUMN {name} {definition}")
 
 
 def _drop_trolleys(conn, path):

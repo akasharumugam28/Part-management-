@@ -338,7 +338,7 @@ img[src*="/img/placeholder-"] { object-fit: contain !important; padding: 10%; }
 
 /* Desktop: real table for parts */
 @media (min-width: 900px) {
-  .stats { grid-template-columns: repeat(2, minmax(0, 260px)); }
+  .stats { grid-template-columns: repeat(4, minmax(0, 220px)); }
   .parts-table thead { display: table-header-group; }
   .parts-table tr { display: table-row; padding: 0; }
   .parts-table td, .parts-table th { display: table-cell; padding: 10px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
@@ -350,6 +350,7 @@ img[src*="/img/placeholder-"] { object-fit: contain !important; padding: 10%; }
   .parts-table .cell-image { width: 72px; }
   .parts-table .cell-qty { width: 96px; text-align: center; }
   .parts-table .cell-qty .muted { display: inline; }
+  .parts-table .cell-count { width: 96px; text-align: center; font-weight: 600; }
   .parts-table th:nth-child(3) { text-align: center; }
   .parts-table .thumb { width: 48px; height: 48px; }
   .parts-table .cell-actions { display: table-cell; white-space: nowrap; text-align: right; margin: 0; }

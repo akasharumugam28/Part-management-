@@ -29,8 +29,15 @@ CREATE TABLE IF NOT EXISTS parts (
     image_filename TEXT,
     trolley_qty    INTEGER CHECK (trolley_qty IS NULL OR trolley_qty BETWEEN 1 AND 9999),
     created_at     TEXT    NOT NULL,
-    updated_at     TEXT    NOT NULL
+    updated_at     TEXT    NOT NULL,
+    total_trolleys INTEGER CHECK (total_trolleys IS NULL OR total_trolleys BETWEEN 0 AND 9999),
+    empty_trolleys INTEGER CHECK (empty_trolleys IS NULL OR empty_trolleys BETWEEN 0 AND 9999)
 );
+-- Columns added after the first release (no-ops on databases that have them).
+ALTER TABLE parts ADD COLUMN IF NOT EXISTS total_trolleys INTEGER
+    CHECK (total_trolleys IS NULL OR total_trolleys BETWEEN 0 AND 9999);
+ALTER TABLE parts ADD COLUMN IF NOT EXISTS empty_trolleys INTEGER
+    CHECK (empty_trolleys IS NULL OR empty_trolleys BETWEEN 0 AND 9999);
 CREATE INDEX IF NOT EXISTS idx_parts_name ON parts (lower(part_name));
 CREATE INDEX IF NOT EXISTS idx_parts_part_number ON parts (lower(part_number));
 

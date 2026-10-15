@@ -26,11 +26,12 @@ def make_source(path):
     conn.executescript(database.SCHEMA)
     conn.execute("INSERT INTO admin VALUES (1, 'admin', ?, 0, '2026-10-13T15:12:11Z')",
                  (generate_password_hash(PASSWORD),))
-    conn.executemany("INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+    conn.executemany("INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
         (2, SPECIAL, "PN-2", "L-2", "O-2", "0123456789abcdef0123456789abcdef.png", 20,
-         "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"),
-        (5, "Nut", "PN-5", "L-5", "O-5", None, None, "2026-02-01T00:00:00Z", "2026-02-01T00:00:00Z"),
-        (9, "Gone", "PN-9", "L", "O", None, 1, "x", "x"),
+         "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", 12, 4),
+        (5, "Nut", "PN-5", "L-5", "O-5", None, None, "2026-02-01T00:00:00Z", "2026-02-01T00:00:00Z",
+         None, None),
+        (9, "Gone", "PN-9", "L", "O", None, 1, "x", "x", 0, 0),
     ])
     conn.executemany("INSERT INTO sub_parts VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
         (3, 2, "Washer", "SP-3", 40, None, "2026-03-01T00:00:00Z", "2026-03-01T00:00:00Z"),
@@ -149,7 +150,7 @@ def test_rerun_creates_no_duplicates(source, tmp_path, empty_pg, capsys):
 def test_new_sqlite_rows_are_added_on_rerun(source, tmp_path, empty_pg):
     assert run(source, tmp_path) == 0
     conn = sqlite3.connect(source)
-    conn.execute("INSERT INTO parts VALUES (12, 'New', 'PN-12', 'L', 'O', NULL, 3, 'c', 'u')")
+    conn.execute("INSERT INTO parts VALUES (12, 'New', 'PN-12', 'L', 'O', NULL, 3, 'c', 'u', NULL, NULL)")
     conn.commit()
     conn.close()
     assert run(source, tmp_path) == 0
@@ -165,7 +166,7 @@ def test_conflict_aborts_without_writing(source, tmp_path, empty_pg, capsys):
     finally:
         db.close()
     conn = sqlite3.connect(source)
-    conn.execute("INSERT INTO parts VALUES (12, 'New', 'PN-12', 'L', 'O', NULL, 3, 'c', 'u')")
+    conn.execute("INSERT INTO parts VALUES (12, 'New', 'PN-12', 'L', 'O', NULL, 3, 'c', 'u', NULL, NULL)")
     conn.commit()
     conn.close()
     capsys.readouterr()

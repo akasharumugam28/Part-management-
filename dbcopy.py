@@ -107,6 +107,8 @@ def totals(conn):
         "sub_parts rows": one("SELECT COUNT(*) FROM sub_parts"),
         "parts trolley_qty total": one("SELECT COALESCE(SUM(trolley_qty), 0) FROM parts"),
         "sub_parts trolley_qty total": one("SELECT COALESCE(SUM(trolley_qty), 0) FROM sub_parts"),
+        "parts total_trolleys total": one("SELECT COALESCE(SUM(total_trolleys), 0) FROM parts"),
+        "parts empty_trolleys total": one("SELECT COALESCE(SUM(empty_trolleys), 0) FROM parts"),
         "images referenced": one(
             "SELECT (SELECT COUNT(*) FROM parts WHERE image_filename IS NOT NULL)"
             " + (SELECT COUNT(*) FROM sub_parts WHERE image_filename IS NOT NULL)"

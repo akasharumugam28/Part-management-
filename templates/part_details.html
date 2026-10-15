@@ -15,6 +15,8 @@
       <div><dt>Part Number</dt><dd>{{ part.part_number }}</dd></div>
       <div><dt>Line Storage</dt><dd>{{ part.line_storage }}</dd></div>
       <div><dt>Current Storage</dt><dd>{{ part.ols_storage }}</dd></div>
+      <div><dt>Total Trolley</dt><dd>{{ part.total_trolleys if part.total_trolleys is not none else '—' }}</dd></div>
+      <div><dt>Empty Trolley</dt><dd>{{ part.empty_trolleys if part.empty_trolleys is not none else '—' }}</dd></div>
       <div><dt>Trolley Qty</dt><dd>{{ part.trolley_qty or '—' }}</dd></div>
     </dl>
     <p class="muted small">Created {{ part.created_at | replace('T', ' ') | replace('Z', ' UTC') }}

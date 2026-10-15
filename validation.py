@@ -53,8 +53,30 @@ def _clean_with_qty(source, limits):
     return data, errors
 
 
+TROLLEY_COUNT_LABELS = {"total_trolleys": "Total Trolley", "empty_trolleys": "Empty Trolley"}
+EMPTY_OVER_TOTAL = "Empty Trolley cannot be more than Total Trolley."
+
+
+def clean_count(raw, label):
+    """Optional whole number 0..QTY_MAX. Returns (value or None, error or None)."""
+    raw = str(raw or "").strip()
+    if not raw:
+        return None, None
+    if not raw.isdigit() or int(raw) > QTY_MAX:
+        return None, f"{label} must be a whole number from 0 to {QTY_MAX}."
+    return int(raw), None
+
+
 def clean_part(source):
-    return _clean_with_qty(source, PART_LIMITS)
+    data, errors = _clean_with_qty(source, PART_LIMITS)
+    for field, label in TROLLEY_COUNT_LABELS.items():
+        data[field], error = clean_count(source.get(field), label)
+        if error:
+            errors[field] = error
+    total, empty = data["total_trolleys"], data["empty_trolleys"]
+    if total is not None and empty is not None and empty > total:
+        errors["empty_trolleys"] = EMPTY_OVER_TOTAL
+    return data, errors
 
 
 def clean_sub_part(source):
@@ -63,4 +85,7 @@ def clean_sub_part(source):
 
 def error_message(errors):
     """The toast shown for a rejected form."""
-    return errors["trolley_qty"] if list(errors) == ["trolley_qty"] else REQUIRED_MESSAGE
+    number_fields = ("trolley_qty", *TROLLEY_COUNT_LABELS)
+    if all(f in number_fields for f in errors):
+        return next(iter(errors.values()))
+    return REQUIRED_MESSAGE

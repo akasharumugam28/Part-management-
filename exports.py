@@ -25,8 +25,10 @@ FORMATS = {
     "pdf": "application/pdf",
 }
 DEFAULT_NAME = "parts-list"
-HEADERS = ("S.No", "Image", "Trolley Qty", "Part Name", "Part Number", "Line Storage", "Current Storage")
+HEADERS = ("S.No", "Image", "Trolley Qty", "Part Name", "Part Number", "Line Storage", "Current Storage",
+           "Total Trolley", "Empty Trolley")
 TEXT_FIELDS = ("part_name", "part_number", "line_storage", "ols_storage")
+COUNT_FIELDS = ("total_trolleys", "empty_trolleys")
 THUMB_PX = 60
 TEAL = "0F766E"
 SUB_FILL = "F0FDFA"
@@ -51,8 +53,13 @@ def _rows(parts, subs):
 
 
 def _value(record, field):
-    # Sub-parts have no storage columns of their own.
+    # Sub-parts have no storage or trolley-count columns of their own.
     return record[field] if field in record.keys() else ""
+
+
+def _count(record, field):
+    value = _value(record, field)
+    return "-" if value is None else str(value)
 
 
 def _summary(parts, subs):
@@ -116,7 +123,8 @@ def build_xlsx(parts, subs, title):
 
     for row, (sno, rec, is_sub) in enumerate(_rows(parts, subs), start=5):
         name = f"↳ {rec['part_name']}" if is_sub else rec["part_name"]
-        ws.append([sno, "", rec["trolley_qty"], name, *(_value(rec, f) for f in TEXT_FIELDS[1:])])
+        ws.append([sno, "", rec["trolley_qty"], name, *(_value(rec, f) for f in TEXT_FIELDS[1:]),
+                   *(_value(rec, f) for f in COUNT_FIELDS)])
         ws.row_dimensions[row].height = THUMB_PX * 0.75 + 6  # points
         for cell in ws[row]:
             indent = 2 if is_sub and cell.column == 4 else 0
@@ -126,7 +134,7 @@ def build_xlsx(parts, subs, title):
                 cell.fill = PatternFill("solid", fgColor=SUB_FILL)
             elif cell.column == 4:
                 cell.font = Font(bold=True)
-        for col in (1, 3):
+        for col in (1, 3, 8, 9):
             ws.cell(row, col).alignment = Alignment(horizontal="center", vertical="center")
         png = thumbs.get(rec["image_filename"])
         if png:
@@ -134,7 +142,7 @@ def build_xlsx(parts, subs, title):
             pic.width, pic.height = _scaled(png, THUMB_PX)
             ws.add_image(pic, f"B{row}")
 
-    for col, width in zip("ABCDEFG", (7, 11, 12, 34, 22, 18, 18)):
+    for col, width in zip("ABCDEFGHI", (7, 11, 12, 34, 22, 18, 18, 13, 13)):
         ws.column_dimensions[col].width = width
     ws.freeze_panes = "A5"
 
@@ -161,7 +169,7 @@ def build_pdf(parts, subs, title):
     ]
 
     thumb = 16 * mm
-    rows = [list(HEADERS)]
+    rows = [[h.replace(" Trolley", "\nTrolley") for h in HEADERS]]  # keep the narrow count columns narrow
     sub_rows = []
     for sno, rec, is_sub in _rows(parts, subs):
         png = thumbs.get(rec["image_filename"])
@@ -174,11 +182,12 @@ def build_pdf(parts, subs, title):
         rows.append([
             sno, img, str(rec["trolley_qty"] or "-"), name,
             *(Paragraph(escape(_value(rec, f)), cell) for f in TEXT_FIELDS[1:]),
+            *(_count(rec, f) for f in COUNT_FIELDS),
         ])
         if is_sub:
             sub_rows.append(len(rows) - 1)
     if len(rows) == 1:
-        rows.append(["", "", "", Paragraph("No parts", cell), "", "", ""])
+        rows.append(["", "", "", Paragraph("No parts", cell), "", "", "", "", ""])
 
     style = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#" + TEAL)),
@@ -188,9 +197,10 @@ def build_pdf(parts, subs, title):
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (2, -1), "CENTER"),
+        ("ALIGN", (7, 0), (8, -1), "CENTER"),
     ]
     style += [("BACKGROUND", (0, r), (-1, r), colors.HexColor("#" + SUB_FILL)) for r in sub_rows]
-    table = Table(rows, colWidths=[14 * mm, 22 * mm, 22 * mm, 71 * mm, 52 * mm, 46 * mm, 46 * mm], repeatRows=1)
+    table = Table(rows, colWidths=[14 * mm, 20 * mm, 20 * mm, 55 * mm, 42 * mm, 38 * mm, 38 * mm, 23 * mm, 23 * mm], repeatRows=1)
     table.setStyle(TableStyle(style))
     story.append(table)
     doc.build(story)

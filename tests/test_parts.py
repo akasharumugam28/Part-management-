@@ -122,7 +122,7 @@ def test_trolley_routes_are_gone(auth_client):
     for path in ("/trolleys/create", "/trolleys/1/update", "/trolleys/1/delete", "/trolleys/1/parts/add"):
         assert auth_client.post(path, data=part_dict(1)).status_code == 404
     page = auth_client.get("/").get_data(as_text=True)
-    assert "Trolley" not in page and "trolley" not in page
+    assert "/trolleys" not in page
 
 
 def test_dashboard_parts_table(auth_client):

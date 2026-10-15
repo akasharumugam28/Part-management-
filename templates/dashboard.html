@@ -32,6 +32,16 @@
     <div><span class="stat-value" id="total-sub-parts">{{ total_subs }}</span>
     <span class="stat-label">Total Sub-parts</span></div>
   </div>
+  <div class="stat card">
+    <svg class="icon stat-icon" aria-hidden="true"><use href="#i-box"></use></svg>
+    <div><span class="stat-value" id="total-trolleys">{{ total_trolleys }}</span>
+    <span class="stat-label">Total Trolley</span></div>
+  </div>
+  <div class="stat card">
+    <svg class="icon stat-icon" aria-hidden="true"><use href="#i-list"></use></svg>
+    <div><span class="stat-value" id="empty-trolleys">{{ empty_trolleys }}</span>
+    <span class="stat-label">Empty Trolley</span></div>
+  </div>
 </section>
 
 <form class="search" role="search" method="get" action="{{ url_for('parts.dashboard') }}">
@@ -54,6 +64,8 @@
         <th scope="col">Part Number</th>
         <th scope="col">Line Storage</th>
         <th scope="col">Current Storage</th>
+        <th scope="col">Total Trolley</th>
+        <th scope="col">Empty Trolley</th>
         <th scope="col"><span class="sr-only">Actions</span></th>
       </tr>
     </thead>
@@ -76,6 +88,8 @@
         <td data-label="Part Number"><code>{{ p.part_number }}</code></td>
         <td data-label="Line Storage">{{ p.line_storage }}</td>
         <td data-label="Current Storage">{{ p.ols_storage }}</td>
+        <td data-label="Total Trolley" class="cell-count">{{ p.total_trolleys if p.total_trolleys is not none else '—' }}</td>
+        <td data-label="Empty Trolley" class="cell-count">{{ p.empty_trolleys if p.empty_trolleys is not none else '—' }}</td>
         <td class="cell-actions">
           <a class="btn btn-icon" href="{{ url_for('parts.part_details', part_id=p.id) }}"
              aria-label="View part {{ p.part_number }}" title="View"><svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg></a>

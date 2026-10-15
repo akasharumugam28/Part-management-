@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import field, image_picker, qty_field %}
+{% from "_macros.html" import count_field, field, image_picker, qty_field %}
 {% set editing = part is defined %}
 {% block title %}{{ 'Edit Part ' ~ part.part_number if editing else 'Create Part' }} · Part Manager{% endblock %}
 {% block content %}
@@ -16,6 +16,10 @@
     {{ field('part_number', 'Part Number', form, errors, maxlength=80) }}
     {{ field('line_storage', 'Line Storage', form, errors) }}
     {{ field('ols_storage', 'Current Storage', form, errors) }}
+    {{ count_field('total_trolleys', 'Total Trolley', form, errors, qty_max,
+         hint='Trolleys used for this part.') }}
+    {{ count_field('empty_trolleys', 'Empty Trolley', form, errors, qty_max,
+         hint='Trolleys currently empty. Cannot be more than Total Trolley.') }}
   </div>
   {{ qty_field(form, errors, qty_presets, qty_max) }}
   {% if editing %}

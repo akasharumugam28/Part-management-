@@ -66,3 +66,15 @@
   <p class="field-error" id="trolley_qty-error"{% if not errors.get('trolley_qty') %} hidden{% endif %}>{{ errors.get('trolley_qty', '') }}</p>
 </div>
 {%- endmacro %}
+
+{% macro count_field(name, label, form, errors, max_value, hint="") -%}
+<div class="field{{ ' has-error' if errors.get(name) }}">
+  <label for="{{ name }}">{{ label }} <span class="optional">(optional)</span></label>
+  <input type="number" id="{{ name }}" name="{{ name }}" value="{{ form.get(name) if form.get(name) is not none else '' }}"
+         min="0" max="{{ max_value }}" step="1" inputmode="numeric"
+         aria-describedby="{{ name }}-hint{{ ' ' ~ name ~ '-error' if errors.get(name) }}"
+         {% if errors.get(name) %}aria-invalid="true"{% endif %}>
+  <p class="hint" id="{{ name }}-hint">{{ hint }}</p>
+  <p class="field-error" id="{{ name }}-error"{% if not errors.get(name) %} hidden{% endif %}>{{ errors.get(name, '') }}</p>
+</div>
+{%- endmacro %}

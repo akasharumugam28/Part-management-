@@ -80,6 +80,13 @@ def count_parts():
     return get_db().execute("SELECT COUNT(*) FROM parts").fetchone()[0]
 
 
+def trolley_totals():
+    """(total trolleys, empty trolleys) summed over all parts."""
+    return tuple(get_db().execute(
+        "SELECT COALESCE(SUM(total_trolleys), 0), COALESCE(SUM(empty_trolleys), 0) FROM parts"
+    ).fetchone())
+
+
 def get_part(part_id):
     return get_db().execute("SELECT * FROM parts WHERE id = ?", (part_id,)).fetchone()
 
@@ -89,17 +96,20 @@ def create_part(data):
     return insert(
         get_db(),
         "INSERT INTO parts (part_name, part_number, line_storage, ols_storage, "
-        "trolley_qty, image_filename, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (*(data[f] for f in PART_FIELDS), data.get("trolley_qty"), data.get("image_filename"), now, now),
+        "trolley_qty, total_trolleys, empty_trolleys, image_filename, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (*(data[f] for f in PART_FIELDS), data.get("trolley_qty"), data.get("total_trolleys"),
+         data.get("empty_trolleys"), data.get("image_filename"), now, now),
     )
 
 
 def update_part(part_id, data):
     get_db().execute(
         "UPDATE parts SET part_name = ?, part_number = ?, line_storage = ?, ols_storage = ?, "
-        "trolley_qty = ?, image_filename = ?, updated_at = ? WHERE id = ?",
-        (*(data[f] for f in PART_FIELDS), data.get("trolley_qty"), data.get("image_filename"),
-         utcnow(), part_id),
+        "trolley_qty = ?, total_trolleys = ?, empty_trolleys = ?, image_filename = ?, updated_at = ? "
+        "WHERE id = ?",
+        (*(data[f] for f in PART_FIELDS), data.get("trolley_qty"), data.get("total_trolleys"),
+         data.get("empty_trolleys"), data.get("image_filename"), utcnow(), part_id),
     )
 
 

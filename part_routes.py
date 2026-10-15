@@ -39,12 +39,15 @@ def dashboard():
     q = request.args.get("q", "").strip()[:100]
     parts = models.list_parts(q or None)
     images.prefetch_urls(p["image_filename"] for p in parts)
+    total_trolleys, empty_trolleys = models.trolley_totals()
     return render_template(
         "dashboard.html",
         parts=parts,
         subs=models.sub_parts_by_part(),
         total=models.count_parts(),
         total_subs=models.count_sub_parts(),
+        total_trolleys=total_trolleys,
+        empty_trolleys=empty_trolleys,
         q=q,
     )
 

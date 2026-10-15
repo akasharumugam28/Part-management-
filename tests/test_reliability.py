@@ -92,7 +92,8 @@ def test_check_constraints_enforced(app):
 def test_schema_tables_and_indexes(app):
     cols = {r["name"] for r in db_rows(app, "PRAGMA table_info(parts)")}
     assert cols == {"id", "part_name", "part_number", "line_storage", "ols_storage",
-                    "image_filename", "trolley_qty", "created_at", "updated_at"}
+                    "image_filename", "trolley_qty", "created_at", "updated_at",
+                    "total_trolleys", "empty_trolleys"}
     cols = {r["name"] for r in db_rows(app, "PRAGMA table_info(admin)")}
     assert cols == {"id", "username", "password_hash", "must_change_password", "created_at"}
     tables = {r["name"] for r in db_rows(app, "SELECT name FROM sqlite_master WHERE type = 'table'")}
@@ -131,8 +132,8 @@ def test_old_trolley_database_is_migrated(tmp_path):
     app = create_app(cfg)
     rows = db_rows(app, "SELECT * FROM parts ORDER BY id")
     assert [tuple(r) for r in rows] == [
-        (5, "Bolt", "PN-5", "L-5", "O-5", "p.png", None, "2026-01-01T00:00:00Z", "u"),
-        (9, "Nut", "PN-9", "L-9", "O-9", None, None, "2026-01-02T00:00:00Z", "u"),
+        (5, "Bolt", "PN-5", "L-5", "O-5", "p.png", None, "2026-01-01T00:00:00Z", "u", None, None),
+        (9, "Nut", "PN-9", "L-9", "O-9", None, None, "2026-01-02T00:00:00Z", "u", None, None),
     ]
     tables = {r["name"] for r in db_rows(app, "SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert "trolleys" not in tables and "parts_old" not in tables
